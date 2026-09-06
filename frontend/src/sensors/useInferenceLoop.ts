@@ -34,8 +34,8 @@ export function useInferenceLoop(latestFrame: SensorFrame | undefined) {
     const init = async () => {
       try {
         await Promise.all([
-          preprocessorRef.current.loadNormalization('/data/normalization.json'),
-          serviceRef.current.loadModel('/models/idr_tcn.onnx')
+          preprocessorRef.current.loadNormalization('/data/normalization_v2.json'),
+          serviceRef.current.loadModel('/models/idr_tcn_v2.onnx')
         ]);
         setDiagnostics(prev => ({ ...prev, modelLoaded: true, modelError: null }));
       } catch (err: any) {

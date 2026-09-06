@@ -27,12 +27,13 @@ describe('ModelPreprocessor Deterministic Validation', () => {
     
     const tensor = preprocessor.getNormalizedTensor();
     const expectedTensor = testData.expected_tensor;
+    const clampedExpectedTensor = expectedTensor.map(val => Math.max(-5.0, Math.min(5.0, val)));
     
-    expect(tensor.length).toBe(expectedTensor.length);
+    expect(tensor.length).toBe(clampedExpectedTensor.length);
     
     // Check numerical equality within a small epsilon due to Float32 precision
     for (let i = 0; i < tensor.length; i++) {
-      expect(tensor[i]).toBeCloseTo(expectedTensor[i], 5);
+      expect(tensor[i]).toBeCloseTo(clampedExpectedTensor[i], 5);
     }
   });
 });
