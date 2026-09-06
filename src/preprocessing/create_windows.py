@@ -5,7 +5,7 @@ import json
 
 # Add src directory to path to import parse_trip
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from src.preprocessing.parse_trip import load_trip_s1
+from src.preprocessing.parse_trip import load_all_featured_trips, load_trip_s1
 
 def extract_window_features(phone_data, vehicle_data, window_size=20, step_size=5):
     """
@@ -26,8 +26,9 @@ def extract_window_features(phone_data, vehicle_data, window_size=20, step_size=
       v_f: Ground truth forward velocity (m/s) at the window endpoint.
     """
     n_frames = min(len(phone_data), len(vehicle_data))
-    
-    # Pre-extract arrays for speed
+    if n_frames < window_size:
+        return np.empty((0, window_size, 9), dtype=np.float32), np.empty((0,), dtype=np.float32)
+        
     ax = np.array([p['ax'] for p in phone_data[:n_frames]], dtype=np.float32)
     ay = np.array([p['ay'] for p in phone_data[:n_frames]], dtype=np.float32)
     az = np.array([p['az'] for p in phone_data[:n_frames]], dtype=np.float32)
@@ -61,28 +62,42 @@ def extract_window_features(phone_data, vehicle_data, window_size=20, step_size=
         X_windows.append(window_x)
         y_targets.append(target_y)
         
-    X_windows = np.array(X_windows, dtype=np.float32)  # Shape: (N, 20, 9)
-    y_targets = np.array(y_targets, dtype=np.float32)  # Shape: (N,)
+    X_windows = np.array(X_windows, dtype=np.float32)
+    y_targets = np.array(y_targets, dtype=np.float32)
     
     return X_windows, y_targets
 
 def build_processed_dataset(output_dir="data/processed"):
     os.makedirs(output_dir, exist_ok=True)
     
-    # 1. Load raw parsed data
-    phone_data, vehicle_data = load_trip_s1()
+    # 1. Load multi-driver trips
+    all_trips = load_all_featured_trips()
+    if not all_trips:
+        print("Warning: Multi-trip loading empty. Falling back to S1 sample.")
+        all_trips = [load_trip_s1()]
+        
+    all_X, all_y = [], []
+    for p_data, v_data in all_trips:
+        X_t, y_t = extract_window_features(p_data, v_data, window_size=20, step_size=5)
+        if len(X_t) > 0:
+            all_X.append(X_t)
+            all_y.append(y_t)
+            
+    X = np.vstack(all_X)
+    y = np.concatenate(all_y)
     
-    # 2. Extract 2-second windows (20 frames @ 10Hz, step size 5 = 50% overlap)
-    print("\nExtracting rolling 2-second IMU windows...")
-    X, y = extract_window_features(phone_data, vehicle_data, window_size=20, step_size=5)
-    print(f"Generated {len(X)} total windows. Input Shape: {X.shape}, Target Shape: {y.shape}")
+    print(f"\nExtracted Multi-Driver Dataset: {len(X)} total 2-second IMU windows across {len(all_trips)} trips.")
+    print(f"Combined Feature Matrix Shape: {X.shape}, Target Vector Shape: {y.shape}")
     
-    # 3. Train / Validation Split (Sequential trip split: first 80% train, last 20% val)
-    split_idx = int(len(X) * 0.8)
-    X_train, y_train = X[:split_idx], y[:split_idx]
-    X_val, y_val = X[split_idx:], y[split_idx:]
+    # 2. Sequential Train / Validation / Test Split (70% Train, 15% Val, 15% Test)
+    train_idx = int(len(X) * 0.70)
+    val_idx = int(len(X) * 0.85)
     
-    # 4. Compute Channel Normalization Statistics (Mean & Std from TRAIN set only)
+    X_train, y_train = X[:train_idx], y[:train_idx]
+    X_val, y_val = X[train_idx:val_idx], y[train_idx:val_idx]
+    X_test, y_test = X[val_idx:], y[val_idx:]
+    
+    # 3. Compute Normalization Statistics (Mean & Std from TRAIN set ONLY as per Section 38 & 39)
     mean = np.mean(X_train, axis=(0, 1))  # 9 values
     std = np.std(X_train, axis=(0, 1))    # 9 values
     std[std == 0] = 1e-6                  # Avoid division by zero
@@ -90,8 +105,9 @@ def build_processed_dataset(output_dir="data/processed"):
     # Normalize features: (X - mean) / std
     X_train_norm = (X_train - mean) / std
     X_val_norm = (X_val - mean) / std
+    X_test_norm = (X_test - mean) / std
     
-    # 5. Save Normalization Parameters for model deployment/inference
+    # 4. Save Normalization Parameters
     norm_params = {
         "channel_names": ["ax", "ay", "az", "gx", "gy", "gz", "accel_mag", "gyro_mag", "jerk"],
         "mean": mean.tolist(),
@@ -104,16 +120,19 @@ def build_processed_dataset(output_dir="data/processed"):
         json.dump(norm_params, f, indent=2)
     print(f"Saved normalization parameters to {norm_path}")
     
-    # 6. Save Processed Datasets
+    # 5. Save Processed Multi-Trip Datasets
     train_path = os.path.join(output_dir, "train_windows.npz")
     val_path = os.path.join(output_dir, "val_windows.npz")
+    test_path = os.path.join(output_dir, "test_windows.npz")
     
     np.savez_compressed(train_path, X=X_train_norm, y=y_train)
     np.savez_compressed(val_path, X=X_val_norm, y=y_val)
+    np.savez_compressed(test_path, X=X_test_norm, y=y_test)
     
     print(f"Saved Train set ({len(X_train)} windows) to {train_path}")
     print(f"Saved Val set   ({len(X_val)} windows) to {val_path}")
-    print("\nDataset preparation completed successfully!")
+    print(f"Saved Test set  ({len(X_test)} windows) to {test_path}")
+    print("\nMulti-Driver Dataset preparation completed successfully!")
 
 if __name__ == "__main__":
     build_processed_dataset()

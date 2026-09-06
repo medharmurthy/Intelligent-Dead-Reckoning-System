@@ -2,35 +2,34 @@ import os
 import csv
 import math
 
-def load_trip_s1(base_dir="data/raw/IO-VNBD/IO-VNBD-master"):
-    s_path = os.path.join(base_dir, "Synchronised V abd S datasets/Categorised IOVNB Dataset/S (Driver A)/S1/S-S1.csv")
-    v_path = os.path.join(base_dir, "Synchronised V abd S datasets/Categorised IOVNB Dataset/S (Driver A)/S1/V-S1.csv")
-    
-    if not os.path.exists(s_path) or os.path.getsize(s_path) < 1000:
-        raise FileNotFoundError(f"Real LFS data file not found at {s_path}. Run download_trip.py first!")
+def parse_single_trip(s_path, v_path):
+    if not (os.path.exists(s_path) and os.path.exists(v_path)):
+        return None, None
+    if os.path.getsize(s_path) < 1000 or os.path.getsize(v_path) < 1000:
+        return None, None
         
-    print(f"Loading Smartphone Data: {s_path}")
-    print(f"Loading Vehicle GT Data:  {v_path}")
-    
-    # Read Smartphone Data
     phone_data = []
     with open(s_path, mode='r', encoding='latin1') as f:
         reader = csv.DictReader(f)
         for row in reader:
             cleaned_row = {k.strip(): v.strip() for k, v in row.items()}
             try:
-                # Find accel keys by checking prefix
-                ax = float([v for k, v in cleaned_row.items() if k.startswith('ACCELEROMETER X')][0])
-                ay = float([v for k, v in cleaned_row.items() if k.startswith('ACCELEROMETER Y')][0])
-                az = float([v for k, v in cleaned_row.items() if k.startswith('ACCELEROMETER Z')][0])
+                ax_keys = [v for k, v in cleaned_row.items() if k.startswith('ACCELEROMETER X')]
+                ay_keys = [v for k, v in cleaned_row.items() if k.startswith('ACCELEROMETER Y')]
+                az_keys = [v for k, v in cleaned_row.items() if k.startswith('ACCELEROMETER Z')]
+                
+                if not (ax_keys and ay_keys and az_keys):
+                    continue
+                    
+                ax = float(ax_keys[0])
+                ay = float(ay_keys[0])
+                az = float(az_keys[0])
                 
                 gx = float(cleaned_row.get('GYROSCOPE Pitch (rad/s)', 0))
                 gy = float(cleaned_row.get('GYROSCOPE Roll (rad/s)', 0))
                 gz = float(cleaned_row.get('GYROSCOPE Yaw (rad/s)', 0))
                 
                 time_ms = float(cleaned_row.get('TIME SINCE START (ms)', 0))
-                
-                # Compute total acceleration magnitude: |a| = sqrt(ax^2 + ay^2 + az^2)
                 accel_mag = math.sqrt(ax**2 + ay**2 + az**2)
                 
                 phone_data.append({
@@ -42,7 +41,6 @@ def load_trip_s1(base_dir="data/raw/IO-VNBD/IO-VNBD-master"):
             except (ValueError, IndexError):
                 continue
                 
-    # Read Vehicle Ground Truth Data
     vehicle_data = []
     with open(v_path, mode='r', encoding='latin1') as f:
         reader = csv.DictReader(f)
@@ -51,8 +49,7 @@ def load_trip_s1(base_dir="data/raw/IO-VNBD/IO-VNBD-master"):
             try:
                 time_s = float(cleaned_row.get('Time Since Start of Day (seconds)', 0))
                 speed_kmh = float(cleaned_row.get('Velocity (km/hr)', 0))
-                speed_mps = round(speed_kmh / 3.6, 4)  # convert km/h to m/s
-                
+                speed_mps = round(speed_kmh / 3.6, 4)
                 heading = float(cleaned_row.get('Heading (degrees)', 0))
                 
                 vehicle_data.append({
@@ -64,18 +61,33 @@ def load_trip_s1(base_dir="data/raw/IO-VNBD/IO-VNBD-master"):
             except (ValueError, IndexError):
                 continue
                 
-    print(f"\nSuccessfully parsed {len(phone_data)} Smartphone IMU frames (~{len(phone_data)/10/60:.1f} minutes of recording at 10Hz)")
-    print(f"Successfully parsed {len(vehicle_data)} Vehicle Ground-Truth frames")
-    
-    print("\n--- First 3 Phone IMU Samples ---")
-    for sample in phone_data[:3]:
-        print(sample)
-        
-    print("\n--- First 3 Vehicle GT Samples ---")
-    for sample in vehicle_data[:3]:
-        print(sample)
-        
     return phone_data, vehicle_data
 
+def load_trip_s1(base_dir="data/raw/IO-VNBD/IO-VNBD-master"):
+    s_path = os.path.join(base_dir, "Synchronised V abd S datasets/Categorised IOVNB Dataset/S (Driver A)/S1/S-S1.csv")
+    v_path = os.path.join(base_dir, "Synchronised V abd S datasets/Categorised IOVNB Dataset/S (Driver A)/S1/V-S1.csv")
+    return parse_single_trip(s_path, v_path)
+
+def load_all_featured_trips(base_dir="data/raw/IO-VNBD/IO-VNBD-master"):
+    all_trips = []
+    cat_dir = os.path.join(base_dir, "Synchronised V abd S datasets/Categorised IOVNB Dataset")
+    if not os.path.exists(cat_dir):
+        cat_dir = base_dir
+        
+    for root, dirs, files in os.walk(cat_dir):
+        s_files = [f for f in files if f.startswith('S-') and f.endswith('.csv')]
+        v_files = [f for f in files if f.startswith('V-') and f.endswith('.csv')]
+        if s_files and v_files:
+            s_path = os.path.join(root, s_files[0])
+            v_path = os.path.join(root, v_files[0])
+            p_data, v_data = parse_single_trip(s_path, v_path)
+            if p_data and v_data and len(p_data) > 100:
+                trip_name = os.path.basename(root)
+                print(f"Loaded Trip [{trip_name}]: {len(p_data)} IMU frames, {len(v_data)} GT frames")
+                all_trips.append((p_data, v_data))
+                
+    print(f"\nTotal Multi-Driver Trips Successfully Parsed: {len(all_trips)}")
+    return all_trips
+
 if __name__ == "__main__":
-    load_trip_s1()
+    load_all_featured_trips()

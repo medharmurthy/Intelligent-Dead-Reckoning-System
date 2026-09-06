@@ -1,0 +1,57 @@
+{
+  "TestA": {
+    "timestamp": 2400,
+    "latitude": 26.145549,
+    "longitude": 91.7362,
+    "speed": 6.94,
+    "heading": 83.0,
+    "mode": "GNSS_AIDED",
+    "gnssQuality": 0.5,
+    "aiConfidence": 0.91,
+    "mapConfidence": 0.5
+  },
+  "TestB": {
+    "timestamp": 5400,
+    "latitude": 26.145782,
+    "longitude": 91.736231,
+    "speed": 40.56,
+    "heading": 95.1,
+    "mode": "DEAD_RECKONING",
+    "gnssQuality": 0.0,
+    "aiConfidence": 0.91,
+    "mapConfidence": 0.5
+  },
+  "TestC": {
+    "timestamp": 6400,
+    "latitude": 26.146766,
+    "longitude": 91.736197,
+    "speed": 51.87,
+    "heading": 97.7,
+    "mode": "REACQUISITION",
+    "gnssQuality": 0.5,
+    "aiConfidence": 0.91,
+    "mapConfidence": 0.5
+  },
+  "TestD": {
+    "timestamp": 6400,
+    "latitude": 26.146766,
+    "longitude": 91.736197,
+    "speed": 51.87,
+    "heading": 97.7,
+    "mode": "REACQUISITION",
+    "gnssQuality": 0.5,
+    "aiConfidence": 0.91,
+    "mapConfidence": 0.5
+  },
+  "TestE": {
+    "timestamp": 7400,
+    "latitude": 26.14686,
+    "longitude": 91.736174,
+    "speed": 43.35,
+    "heading": 105.6,
+    "mode": "DEAD_RECKONING",
+    "gnssQuality": 0.0,
+    "aiConfidence": 0.91,
+    "mapConfidence": 0.5
+  }
+}
