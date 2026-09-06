@@ -23,7 +23,7 @@ export default function App() {
   
   const { diagnostics: inferenceDiag } = useInferenceLoop(latestFrame);
   const aiOutput = inferenceDiag.latestOutput;
-  const { navState, history } = useNavigation(latestFrame, aiOutput, sensorDiag.stationary.isStationary);
+  const { navState, history } = useNavigation(latestFrame, aiOutput, sensorDiag.stationary.isStationary, simulateGnssLoss);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);

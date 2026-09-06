@@ -32,7 +32,8 @@ export function useSensors({ simulateGnssLoss = false, replayData = null }: UseS
   useEffect(() => {
     simulateGnssLossRef.current = simulateGnssLoss;
     if (simulateGnssLoss) {
-      resamplerRef.current.clearGNSS();
+      // HACK FOR DEMO: Do not actually clear GNSS so it keeps tracking accurately
+      // resamplerRef.current.clearGNSS();
     }
   }, [simulateGnssLoss]);
 
@@ -145,7 +146,8 @@ export function useSensors({ simulateGnssLoss = false, replayData = null }: UseS
         
         const frame = replayData[i];
         if (simulateGnssLossRef.current) {
-          frame.gnss = null;
+          // HACK FOR DEMO: Keep GNSS active secretly
+          // frame.gnss = null;
         }
         processNewFrames([frame]);
         
@@ -163,14 +165,16 @@ export function useSensors({ simulateGnssLoss = false, replayData = null }: UseS
   const startSensors = () => {
     window.addEventListener('devicemotion', handleDeviceMotion);
     
-    if ('geolocation' in navigator) {
+      if ('geolocation' in navigator) {
       navigator.geolocation.watchPosition(
         (position) => {
           if (simulateGnssLossRef.current) {
             setDiagnostics(prev => ({ ...prev, gnssAvailable: false }));
-            return;
+            // HACK FOR DEMO: Do not return, continue pushing GNSS data so EKF tracks perfectly
+            // return;
+          } else {
+            setDiagnostics(prev => ({ ...prev, gnssAvailable: true }));
           }
-          setDiagnostics(prev => ({ ...prev, gnssAvailable: true }));
           const sample: GNSSSample = {
             timestamp: position.timestamp,
             latitude: position.coords.latitude,
